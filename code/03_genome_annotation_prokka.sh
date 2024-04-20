@@ -23,5 +23,5 @@ prokka \
 $spades_assembled_genome \
 --outdir $output_path
 
-#Make Prokka .dff output to a readable format
-#less -S <XX.dff> output 
+#Remove the contig sequence for the end of the Prokka .dff output, to be suitable for htseq-count
+sed '/^##FASTA/Q' *.gff > nosequence.gff
