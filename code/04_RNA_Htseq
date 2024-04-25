@@ -1,0 +1,43 @@
+#!/bin/bash -l
+
+#SBATCH-A uppmax2024-2-7
+#SBATCH-M snowy
+#SBATCH-p core
+#SBATCH-n 2
+#SBATCH-t 09:00:00
+#SBATCH-J RNA_read_count
+#SBATCH--mail-type=ALL
+#SBATCH--mail-user emdi4663@student.uu.se
+#SBATCH--output=%x.%j.out
+
+#Load the modules
+module load bioinfo-tools
+module load htseq/2.0.2
+module load samtools/1.19
+
+bh_1=/home/emdi4663/Genome-Analysis-Paper-I/analyses/04_diff_expression_analysis/bh_72*.bam
+bh_2=/home/emdi4663/Genome-Analysis-Paper-I/analyses/04_diff_expression_analysis/bh_73*.bam
+bh_3=/home/emdi4663/Genome-Analysis-Paper-I/analyses/04_diff_expression_analysis/bh_74*.bam
+
+serum_1=/home/emdi4663/Genome-Analysis-Paper-I/analyses/04_diff_expression_analysis/serum_69*.bam
+serum_2=/home/emdi4663/Genome-Analysis-Paper-I/analyses/04_diff_expression_analysis/serum_70*.bam
+serum_3=/home/emdi4663/Genome-Analysis-Paper-I/analyses/04_diff_expression_analysis/serum_71*.bam
+
+annotated_genome=/home/emdi4663/Genome-Analysis-Paper-I/analyses/03_annotation/nosequence.gff
+
+work_dir=/home/emdi4663/Genome-Analysis-Paper-I/analyses/04_diff_expression_analysis
+
+cd $work_dir
+
+#Index the .bam files (could have been done as a last step in mapping)
+for i in $bh_1 $bh_2 $bh_3 $serum_1 $serum_2 $serum_3; do
+    samtools index ${i} 
+done
+
+#This script takes one or more alignment files in SAM/BAM format and a feature file in GFF format and calculates for each
+#feature the number of reads mapping to it.
+for i in $bh_1 $bh_2 $bh_3 $serum_1 $serum_2 $serum_3; do
+    htseq-count -f bam -t CDS -i ID -r pos -s no ${i} $annotated_genome > $(basename -s ".bam" ${i})_count.txt
+
+done
+
