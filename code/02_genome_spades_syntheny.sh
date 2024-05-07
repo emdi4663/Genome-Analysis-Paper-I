@@ -22,8 +22,7 @@ genome_ref=/home/emdi4663/Genome-Analysis-Paper-I/data/genome_reference/*.fna.gz
 
 output_path=/home/emdi4663/Genome-Analysis-Paper-I/code
 
-#The commands
-##Alignment
+#The alignment command
 blastn -query $spades_query -subject  <(gunzip -c $genome_ref) -outfmt 6 -out $output_path/spades_blast.out
 
 ##Alignment with first 3 contigs (edited assmebly)
