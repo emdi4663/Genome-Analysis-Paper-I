@@ -26,5 +26,6 @@ output_path=/home/emdi4663/Genome-Analysis-Paper-I/code
 ##Alignment
 blastn -query $spades_query -subject  <(gunzip -c $genome_ref) -outfmt 6 -out $output_path/spades_blast.out
 
-##Visualisation
-#artemis/act - $output_path/spades_blast.out  
+##Alignment with first 3 contigs (edited assmebly)
+edited_spades=/home/emdi4663/Genome-Analysis-Paper-I/analyses/02_genome_assembly/spades/spades_filtered_conc.fasta 
+blastn -query $edited_spades -subject  <(gunzip -c $genome_ref) -outfmt 6 -out $output_path/spades_conc_blast.out
