@@ -1,0 +1,184 @@
+#RMarkdown code for the differential expression analysis performed using DESeq2 package
+
+#Making the working directory into a variable
+
+```{r}
+directory <- "C:/Users/emmad/OneDrive - Uppsala universitet/Genome Analysis/Project_GenAnalysis/Differential_expression_analysis"
+```
+
+#Loading the data in the DESeq-compatible format into R
+```{r}
+
+fileName <- list.files(pattern = "*.txt", path = directory)
+
+sampleCondition <- sub("(.*)_.*.txt*","\\1",fileName)
+sampleFiles <- sub("(.*).txt*","\\1",fileName)
+
+sampleTable <- data.frame(sampleName = sampleFiles,
+                          fileName = fileName,
+                          condition = sampleCondition)
+sampleTable$condition <- factor(sampleTable$condition)
+
+ddsHTSeq <- DESeqDataSetFromHTSeqCount(sampleTable = sampleTable,
+                                       directory = directory,
+                                       design= ~ condition)
+ddsHTSeq
+```
+
+#Setting reference level for the data
+```{r}
+ddsHTSeq$condition <- relevel(ddsHTSeq$condition, ref = "BHI")
+```
+
+#Running the DESeq function 
+```{r}
+ddsHTSeq <- DESeq(ddsHTSeq)
+```
+
+#Extracting the unfiltered DESeq results and getting the summary
+```{r}
+res <- results(ddsHTSeq)
+res
+
+summary(res)
+```
+
+#Plotting the results
+```{r}
+
+plotMA(res, ylim=c(-5,5))
+title(main = "All differentially expressed genes")
+
+resultsNames(ddsHTSeq)
+
+```
+
+#Shrinking the log fold changes by variance - data filtering that didn't make a difference 
+```{r}
+#Filtering based on the spread of the counts
+res_shrinked <- lfcShrink(ddsHTSeq, coef="condition_SERUM_vs_BHI", type="apeglm")
+res_shrinked
+```
+
+#Plotting the shrunken data 
+```{r}
+plotMA(res_shrinked, ylim=c(-5,5))
+summary(res_shrinked)
+```
+
+#Subsetting the results of DESeq, by filtering based on p-adjusted value of 0.001 and abs(log2foldchange) larger than 1. Both from the shrunken and original results (res)
+```{r}
+signif_genes <- subset(res, padj < 0.001 & abs(log2FoldChange) > 1)
+summary(signif_genes)
+
+signif_genes_filtered <- subset(res_shrinked, padj < 0.001 & abs(log2FoldChange) > 1)
+summary(signif_genes_filtered)
+
+```
+
+#Plotting the most significant genes filtered by p-adjusted value of 0.001 and abs(log2foldchange) larger than 1.
+```{r}
+plotMA(signif_genes_filtered ,ylim=c(-5,5))
+
+```
+
+#Ordering the filtered (significant) genes by log2fold change
+```{r}
+
+signif_genes_ordered_log2foldchange <- signif_genes_filtered[order(signif_genes_filtered$log2FoldChange, decreasing = TRUE),] 
+
+print(signif_genes_ordered_log2foldchange)                           
+```
+
+#Extracting the top 10 most down- and upregulated genes (highest and lowest log2fold change)
+```{r}
+top10_upregulated <- head(signif_genes_ordered_log2foldchange, n = 10)
+print(top10_upregulated)
+
+top10_downregulated <- tail(signif_genes_ordered_log2foldchange, n = 10)
+print(top10_downregulated)
+```
+
+#Generating PCA to show how the samples cluster in relation to one another. Here the plotted principal components will be the first two (the firsts usually capture the most of teh variability)
+
+```{r}
+ddsHTSeq <- estimateSizeFactors(ddsHTSeq)
+
+#The vst function performs the variance stabilizing - a way of data transformation (important since the variance of the counts tends to increase with higher mean expression valuee. Variance more pronounced for lowly expressed genes compared to their relative mean level expression)
+
+#Blind = TRUE doesn't take into acount the experimental design, different conditions. Treats all samples as independent and estimates dispersions solely based on the overall variability in the data.
+#Blind = FALSE, uses the information about sample groups (e.g., treatment vs. control) to estimate dispersions separately for each group,
+
+vsdata <- vst(ddsHTSeq, blind = TRUE)
+vsdata
+```
+```{r}
+print(vsdata)
+```
+
+```{r}
+vst_filtered = vsdata[row.names(signif_genes_filtered)]
+```
+
+```{r}
+plotPCA(vsdata, intgroup = "condition")
+plotPCA(vst_filtered, intgroup = "condition" )
+```
+#Plotting the heat map of the sample-to-sample distances which shows similarities between samples. 
+#It is based on distance matrix hierarchical clustering
+
+```{r}
+sampleDists <- dist(t(assay(vst_filtered)))
+```
+
+```{r}
+library("RColorBrewer")
+library("pheatmap")
+
+sampleDistMatrix <- as.matrix(sampleDists)
+
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+#Heatmap on the count data, to see how the genes differ in the read count/expression 
+
+```{r}
+
+# Assuming your DESeq2 object is named ddsHTSeq
+library("DESeq2")
+library("pheatmap")
+
+#res <- lfcShrink(ddsHTSeq, coef="condition_SERUM_vs_BHI", type="apeglm")
+
+res <- results(ddsHTSeq, contrast=c("condition", "SERUM", "BHI"))
+
+# Filtering results for significant genes like before
+res_filtered <- res[which(abs(res$log2FoldChange) > 1 & res$padj < 0.001), ]
+
+# Extracting the gene names of the top upregulated and downregulated genes
+top_up_genes <- rownames(res_filtered)[order(res_filtered$log2FoldChange, decreasing = TRUE)[1:10]]
+
+top_down_genes <- rownames(res_filtered)[order(res_filtered$log2FoldChange, decreasing = FALSE)[1:10]]
+
+# Combine top upregulated and downregulated genes
+top_genes <- c(top_up_genes, top_down_genes)
+top_genes
+
+# Extracting normalized counts for the top genes
+ntd <- normTransform(ddsHTSeq)
+ntd_top_genes <- assay(ntd)[top_genes, ] #filtering based on the names of the top_genes
+
+# Create heatmap
+
+heatmap_plotted <- pheatmap(ntd_top_genes, cluster_rows = TRUE, show_rownames = TRUE, cluster_cols = FALSE)
+
+#Saving the heatmap as a png file 
+library(ggplot2)
+ggsave('Top_20_differentially_expressed_genes.png', plot = heatmap_plotted)
+
+```
